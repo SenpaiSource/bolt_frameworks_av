@@ -4463,6 +4463,14 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
 
             // only process effects if we're going to write
             if (mSleepTimeUs == 0 && mType != OFFLOAD) {
+                if (mType == SPATIALIZER && mMixerStatus != MIXER_TRACKS_READY) {
+                    if (mEffectBuffer != nullptr) {
+                        memset(mEffectBuffer, 0, mEffectBufferSize);
+                    }
+                    if (mPostSpatializerBuffer != nullptr) {
+                        memset(mPostSpatializerBuffer, 0, mPostSpatializerBufferSize);
+                    }
+                }
                 for (size_t i = 0; i < effectChains.size(); i ++) {
                     effectChains[i]->process_l();
                     // TODO: Write haptic data directly to sink buffer when mixing.
@@ -4537,7 +4545,9 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
                                        mNormalFrameCount * mHapticChannelCount);
             }
             const size_t framesToCopy = mNormalFrameCount * (mChannelCount + mHapticChannelCount);
-            if (mFormat == AUDIO_FORMAT_PCM_FLOAT &&
+            if (mType == SPATIALIZER && mMixerStatus != MIXER_TRACKS_READY) {
+                memset(mSinkBuffer, 0, mSinkBufferSize);
+            } else if (mFormat == AUDIO_FORMAT_PCM_FLOAT &&
                     mEffectBufferFormat == AUDIO_FORMAT_PCM_FLOAT) {
                 // Clamp PCM float values more than this distance from 0 to insulate
                 // a HAL which doesn't handle NaN correctly.
@@ -6390,6 +6400,12 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
             if (chain != 0) {
                 chain->clearInputBuffer();
             }
+            if (mType == SPATIALIZER) {
+                sp<IAfEffectChain> spatChain = getEffectChain_l(AUDIO_SESSION_OUTPUT_STAGE);
+                if (spatChain != 0) {
+                    spatChain->clearInputBuffer();
+                }
+            }
 
             ALOGVV("track(%d) s=%08x [NOT READY] on thread %p", trackId, cblk->mServer, this);
             if ((track->sharedBuffer() != 0) || track->isTerminated() ||
@@ -6514,6 +6530,15 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
         // passing a non-clean buffer to the effect chain
         memset(mEffectBuffer, 0, mEffectBufferSize);
         if (mType == SPATIALIZER) {
+            memset(mPostSpatializerBuffer, 0, mPostSpatializerBufferSize);
+        }
+    }
+    if (mType == SPATIALIZER && (mixedTracks == 0 || mixerStatus != MIXER_TRACKS_READY)) {
+        sp<IAfEffectChain> spatChain = getEffectChain_l(AUDIO_SESSION_OUTPUT_STAGE);
+        if (spatChain != 0) {
+            spatChain->clearInputBuffer();
+        }
+        if (mPostSpatializerBuffer != nullptr) {
             memset(mPostSpatializerBuffer, 0, mPostSpatializerBufferSize);
         }
     }

@@ -8847,7 +8847,6 @@ void AudioPolicyManager::checkSpatializedClientsReroute(
         audio_attributes_t attr = client->attributes();
         audio_config_base_t clientConfig = client->config();
         audio_config_t config = audio_config_initializer(&clientConfig);
-
         if (client->isSpatialized() != shouldBeSpatialized(&attr, &config,
                 devices.toTypeAddrVector(), client->flags(), client->session(),
                 getPreferredMixerAttributesInfo(outputDesc->devices()[0]->getId(),
@@ -8870,6 +8869,8 @@ bool AudioPolicyManager::shouldBeSpatialized(const audio_attributes_t *attr,
                                              const sp<PreferredMixerAttributesInfo>& mixConfInfo) {
     if (mSpatializerOutput != nullptr && canBeSpatializedInt(attr, config, devices)
             && ((flags & (AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD | AUDIO_OUTPUT_FLAG_DIRECT)) == 0)
+            && !((config != nullptr) && (config->channel_mask == AUDIO_CHANNEL_OUT_STEREO)
+                 && ((flags & (AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_RAW)) != 0))
             && checkHapticCompatibilityOnSpatializerOutput(config, session)
             && mixConfInfo == nullptr) {
         return true;
