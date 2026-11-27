@@ -1467,6 +1467,11 @@ protected:
     // Set to "true" to enable when data has already copied to sink
     bool mHasDataCopiedToSinkBuffer GUARDED_BY(ThreadBase_ThreadLoop) = false;
 
+    // Track whether the spatializer thread has ready spatialized tracks on the current
+    // mixer cycle so output-stage spatializer processing can be paused and reset cleanly.
+    bool mHasReadySpatializedTracks GUARDED_BY(ThreadBase_ThreadLoop) = false;
+    bool mSpatializerWasActive GUARDED_BY(ThreadBase_ThreadLoop) = false;
+
     // Frame size aligned buffer used as input and output to all post processing effects
     // except the Spatializer in a SPATIALIZER thread. Non spatialized tracks are mixed into
     // this buffer so that post processing effects can be applied.

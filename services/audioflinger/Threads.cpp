@@ -4463,15 +4463,28 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
 
             // only process effects if we're going to write
             if (mSleepTimeUs == 0 && mType != OFFLOAD) {
-                if (mType == SPATIALIZER && mMixerStatus != MIXER_TRACKS_READY) {
-                    if (mEffectBuffer != nullptr) {
-                        memset(mEffectBuffer, 0, mEffectBufferSize);
-                    }
-                    if (mPostSpatializerBuffer != nullptr) {
-                        memset(mPostSpatializerBuffer, 0, mPostSpatializerBufferSize);
+                if (mType == SPATIALIZER) {
+                    if (mHasReadySpatializedTracks) {
+                        mSpatializerWasActive = true;
+                    } else {
+                        if (mEffectBuffer != nullptr) {
+                            memset(mEffectBuffer, 0, mEffectBufferSize);
+                        }
+                        if (mMixerStatus != MIXER_TRACKS_READY &&
+                                mPostSpatializerBuffer != nullptr) {
+                            memset(mPostSpatializerBuffer, 0, mPostSpatializerBufferSize);
+                        }
                     }
                 }
                 for (size_t i = 0; i < effectChains.size(); i ++) {
+                    if (mType == SPATIALIZER && !mHasReadySpatializedTracks &&
+                            effectChains[i]->sessionId() == AUDIO_SESSION_OUTPUT_STAGE) {
+                        if (mSpatializerWasActive) {
+                            effectChains[i]->resetEffects_l();
+                            mSpatializerWasActive = false;
+                        }
+                        continue;
+                    }
                     effectChains[i]->process_l();
                     // TODO: Write haptic data directly to sink buffer when mixing.
                     if (activeHapticSessionId != AUDIO_SESSION_NONE
@@ -5696,6 +5709,7 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
     mixer_state mixerStatus = MIXER_IDLE;
     // find out which tracks need to be processed
     size_t mixedTracks = 0;
+    size_t spatializedTracks = 0;
     size_t tracksWithEffect = 0;
     // counts only _active_ fast tracks
     size_t fastTracks = 0;
@@ -6085,6 +6099,9 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
             ALOGVV("track(%d) s=%08x [OK] on thread %p", trackId, cblk->mServer, this);
 
             mixedTracks++;
+            if (mType == SPATIALIZER && track->isSpatialized()) {
+                spatializedTracks++;
+            }
 
             // track->mainBuffer() != mSinkBuffer and mMixerBuffer means
             // there is an effect chain connected to the track
@@ -6533,12 +6550,13 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
             memset(mPostSpatializerBuffer, 0, mPostSpatializerBufferSize);
         }
     }
-    if (mType == SPATIALIZER && (mixedTracks == 0 || mixerStatus != MIXER_TRACKS_READY)) {
+    if (mType == SPATIALIZER && (spatializedTracks == 0 || mixerStatus != MIXER_TRACKS_READY)) {
         sp<IAfEffectChain> spatChain = getEffectChain_l(AUDIO_SESSION_OUTPUT_STAGE);
         if (spatChain != 0) {
             spatChain->clearInputBuffer();
         }
-        if (mPostSpatializerBuffer != nullptr) {
+        if (mPostSpatializerBuffer != nullptr &&
+                (mixedTracks == 0 || mixerStatus != MIXER_TRACKS_READY)) {
             memset(mPostSpatializerBuffer, 0, mPostSpatializerBufferSize);
         }
     }
@@ -6571,6 +6589,9 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
     if (fastTracks > 0) {
         mixerStatus = MIXER_TRACKS_READY;
     }
+    mHasReadySpatializedTracks = (mType == SPATIALIZER &&
+            spatializedTracks > 0 &&
+            mixerStatus == MIXER_TRACKS_READY);
     return mixerStatus;
 }
 

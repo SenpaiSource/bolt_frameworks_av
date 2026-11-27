@@ -236,6 +236,7 @@ public:
     static constexpr int kProcessTailDurationMs = 1000;
 
     virtual void process_l() REQUIRES(audio_utils::EffectChain_Mutex) = 0;
+    virtual void resetEffects_l() REQUIRES(audio_utils::EffectChain_Mutex) = 0;
 
     virtual audio_utils::mutex& mutex() const RETURN_CAPABILITY(audio_utils::EffectChain_Mutex) = 0;
 

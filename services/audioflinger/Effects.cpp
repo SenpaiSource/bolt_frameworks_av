@@ -2399,6 +2399,15 @@ void EffectChain::process_l() {
     }
 }
 
+// Must be called with EffectChain::mutex() locked
+void EffectChain::resetEffects_l() {
+    clearInputBuffer_l();
+    for (size_t i = 0; i < mEffects.size(); i++) {
+        std::vector<uint8_t> replyData(sizeof(int32_t));
+        mEffects[i]->command(EFFECT_CMD_RESET, {}, sizeof(int32_t), &replyData);
+    }
+}
+
 status_t EffectChain::createEffect(sp<IAfEffectModule>& effect,
                                                    effect_descriptor_t *desc,
                                                    int id,

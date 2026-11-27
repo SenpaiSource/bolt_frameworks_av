@@ -475,6 +475,7 @@ public:
                 const sp<IAfThreadCallback>& afThreadCallback);
 
     void process_l() final REQUIRES(audio_utils::EffectChain_Mutex);
+    void resetEffects_l() final REQUIRES(audio_utils::EffectChain_Mutex);
 
     audio_utils::mutex& mutex() const final RETURN_CAPABILITY(audio_utils::EffectChain_Mutex) {
         return mMutex;

@@ -7030,8 +7030,10 @@ void AudioPolicyManager::checkVirtualizerClientRoutes() {
             AudioDeviceTypeAddrVector devicesTypeAddress = devices.toTypeAddrVector();
             audio_config_base_t clientConfig = client->config();
             audio_config_t config = audio_config_initializer(&clientConfig);
-            if (desc != mSpatializerOutput
-                    && canBeSpatializedInt(&attr, &config, devicesTypeAddress)) {
+            bool canSpatialize = canBeSpatializedInt(&attr, &config, devicesTypeAddress)
+                    && !((config.channel_mask == AUDIO_CHANNEL_OUT_STEREO)
+                         && ((client->flags() & (AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_RAW)) != 0));
+            if (desc != mSpatializerOutput && canSpatialize) {
                 clientsToInvalidate.push_back(client->portId());
             }
         }
